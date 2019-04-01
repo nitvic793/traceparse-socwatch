@@ -45,6 +45,11 @@ namespace TraceParse.SocWatch
         {
             
             var file = "trace.csv";
+            if(args.Length>0)
+            {
+                file = args[0];
+            }
+
             var powerRecordFile = "power.csv";
             var energyRecordFile = "energy.csv";
             var energyRecords = new List<EnergyRecord>();
