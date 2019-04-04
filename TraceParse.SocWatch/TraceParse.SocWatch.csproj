@@ -54,6 +54,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="log.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
     <None Include="pchase3_trace.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
