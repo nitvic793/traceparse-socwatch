@@ -112,6 +112,19 @@ namespace TraceParse.SocWatch
         public float EnergyAverage { get; set; }
 
         [Index(6)]
+        public float MinPower { get; set; }
+
+        [Index(7)]
+        public float MinEnergy { get; set; }
+
+        [Index(8)]
+        public float MaxPower { get; set; }
+
+        [Index(9)]
+        public float MaxEnergy { get; set; }
+
+
+        [Index(10)]
         public float SampleCount { get; set; }
     }
 
@@ -124,7 +137,8 @@ namespace TraceParse.SocWatch
         public List<EventRecord> EventRecords;
         public List<FrameRecord> FrameRecords;
     }
-    public static class Parser
+
+    public static class TraceParser
     {
         public static DataOutput ParseFile(string file, string logFile)
         {
@@ -216,49 +230,84 @@ namespace TraceParse.SocWatch
             var frameIndex = 0;
             float pValue = 0F;
             float eValue = 0F;
-
+            int idx = 0;
             int count = 0;
-            for (int i = 0; i < output.PowerRecords.Count;)
+            while (output.FrameRecords[frameIndex].CTime > output.PowerRecords[idx].CTime)
+            {
+                idx++;
+            }
+
+            float maxPower = 0F;
+            float maxEnergy = 0F;
+            float minPower = float.MaxValue;
+            float minEnergy = float.MaxValue;
+            while (idx < output.PowerRecords.Count)
             {
                 if (frameIndex >= output.FrameRecords.Count)
                 {
                     break;
                 }
 
-                if (output.FrameRecords[frameIndex].CTime > output.PowerRecords[i].CTime)
+                if (output.FrameRecords[frameIndex].CTime > output.PowerRecords[idx].CTime)
                 {
-                    pValue += output.PowerRecords[i].PowerData;
-                    eValue += output.EnergyRecords[i].EnergyData;
+                    if (output.PowerRecords[idx].PowerData <= minPower)
+                    {
+                        minPower = output.PowerRecords[idx].PowerData;
+                    }
+
+                    if (output.EnergyRecords[idx].EnergyData <= minEnergy)
+                    {
+                        minEnergy = output.EnergyRecords[idx].EnergyData;
+                    }
+
+                    if (output.PowerRecords[idx].PowerData >= maxPower)
+                    {
+                        maxPower = output.PowerRecords[idx].PowerData;
+                    }
+
+                    if (output.EnergyRecords[idx].EnergyData >= maxEnergy)
+                    {
+                        maxEnergy = output.EnergyRecords[idx].EnergyData;
+                    }
+
+                    pValue += output.PowerRecords[idx].PowerData;
+                    eValue += output.EnergyRecords[idx].EnergyData;
                     count++;
-                    i++;
-                }
-                else
-                {
-                    
+                    idx++;
                 }
 
-                if(output.FrameRecords[frameIndex].CTime <= output.PowerRecords[i].CTime)
+                if (output.FrameRecords[frameIndex].CTime <= output.PowerRecords[idx].CTime)
                 {
                     var frameRecord = output.FrameRecords[frameIndex];
                     if (count != 0)
                     {
+                        frameRecord.MinEnergy = minEnergy;
+                        frameRecord.MinPower = minPower;
+                        frameRecord.MaxEnergy = maxEnergy;
+                        frameRecord.MaxPower = maxPower;
                         frameRecord.Power = pValue;
                         frameRecord.Energy = eValue;
-                        frameRecord.PowerAverage = pValue / count; 
+                        frameRecord.PowerAverage = pValue / count;
                         frameRecord.EnergyAverage = eValue / count;
                         frameRecord.SampleCount = count;
                     }
                     else
                     {
-                        frameRecord.Power = output.PowerRecords[i].PowerData;
-                        frameRecord.Energy = output.EnergyRecords[i].EnergyData;
-                        frameRecord.PowerAverage = output.PowerRecords[i].PowerData;
-                        frameRecord.EnergyAverage = output.EnergyRecords[i].EnergyData;
+                        frameRecord.MinPower = output.PowerRecords[idx].PowerData;
+                        frameRecord.MinEnergy = output.EnergyRecords[idx].EnergyData;
+                        frameRecord.MaxPower = output.PowerRecords[idx].PowerData;
+                        frameRecord.MaxEnergy = output.EnergyRecords[idx].EnergyData;
+                        frameRecord.Power = output.PowerRecords[idx].PowerData;
+                        frameRecord.Energy = output.EnergyRecords[idx].EnergyData;
+                        frameRecord.PowerAverage = output.PowerRecords[idx].PowerData;
+                        frameRecord.EnergyAverage = output.EnergyRecords[idx].EnergyData;
                         frameRecord.SampleCount = 1;
                     }
                     output.FrameRecords[frameIndex] = frameRecord;
                     pValue = eValue = 0F;
                     count = 0;
+                    maxEnergy = maxPower = 0F;
+                    minEnergy = minPower = float.MaxValue;
                     frameIndex++;
                 }
 
@@ -270,9 +319,10 @@ namespace TraceParse.SocWatch
         public static DataOutput GetAverage(List<DataOutput> outputs)
         {
             DataOutput output = new DataOutput();
-
+            var stopProcessing = false;
             output.EnergyRecords = new List<EnergyRecord>(outputs[0].EnergyRecords.Count);
             output.PowerRecords = new List<PowerRecord>(outputs[0].PowerRecords.Count);
+            output.FrameRecords = new List<FrameRecord>(outputs[0].FrameRecords.Count);
             int sampleSize = outputs[0].PowerRecords.Count;
             for (int i = 0; i < sampleSize; ++i)
             {
@@ -292,8 +342,13 @@ namespace TraceParse.SocWatch
                     Duration = 0F
                 };
 
-                for (int k = 0; k < outputs.Count; ++i)
+                for (int k = 0; k < outputs.Count; ++k)
                 {
+                    if (i >= outputs[k].EnergyRecords.Count || i >= outputs[k].PowerRecords.Count)
+                    {
+                        stopProcessing = true;
+                        break;
+                    }
                     energyRecord.SampleNumber = outputs[k].EnergyRecords[i].SampleNumber;
                     energyRecord.CTime += outputs[k].EnergyRecords[i].CTime;
                     energyRecord.Duration += outputs[k].EnergyRecords[i].Duration;
@@ -305,19 +360,140 @@ namespace TraceParse.SocWatch
                     powerRecord.PowerData += outputs[k].PowerRecords[i].PowerData;
                 }
 
+                if (stopProcessing)
+                {
+                    break;
+                }
+
                 //Get Average across one row and store it
                 energyRecord.CTime /= outputs.Count;
                 energyRecord.Duration /= outputs.Count;
                 energyRecord.EnergyData /= outputs.Count;
-                output.EnergyRecords[i] = energyRecord;
+                output.EnergyRecords.Add(energyRecord);
 
                 powerRecord.CTime /= outputs.Count;
                 powerRecord.Duration /= outputs.Count;
                 powerRecord.PowerData /= outputs.Count;
-                output.PowerRecords[i] = powerRecord;
+                output.PowerRecords.Add(powerRecord);
+            }
+
+            stopProcessing = false;
+            for (int i = 0; i < outputs[0].FrameRecords.Count; ++i)
+            {
+                var frameRecord = new FrameRecord
+                {
+                    SampleCount = 0,
+                    CTime = 0F,
+                    Energy = 0,
+                    EnergyAverage = 0,
+                    MaxEnergy = 0,
+                    MinEnergy = 0,
+                    Power = 0,
+                    PowerAverage = 0,
+                    MaxPower = 0,
+                    MinPower = 0
+                };
+
+                for (int k = 0; k < outputs.Count; ++k)
+                {
+                    if (i >= outputs[k].FrameRecords.Count)
+                    {
+                        stopProcessing = true;
+                        break;
+                    }
+                    frameRecord.FrameNumber = outputs[k].FrameRecords[i].FrameNumber;
+                    frameRecord.CTime += outputs[k].FrameRecords[i].CTime;
+                    frameRecord.Energy += outputs[k].FrameRecords[i].Energy;
+                    frameRecord.Power += outputs[k].FrameRecords[i].Power;
+                    frameRecord.EnergyAverage += outputs[k].FrameRecords[i].EnergyAverage;
+                    frameRecord.PowerAverage += outputs[k].FrameRecords[i].PowerAverage;
+                    frameRecord.MaxPower += outputs[k].FrameRecords[i].MaxPower;
+                    frameRecord.MaxEnergy += outputs[k].FrameRecords[i].MaxEnergy;
+                    frameRecord.MinPower += outputs[k].FrameRecords[i].MinPower;
+                    frameRecord.MinEnergy += outputs[k].FrameRecords[i].MinEnergy;
+                    frameRecord.SampleCount += outputs[k].FrameRecords[i].SampleCount;
+                }
+
+                if (stopProcessing) break;
+
+                frameRecord.CTime /= outputs.Count;
+                frameRecord.Energy /= outputs.Count;
+                frameRecord.Power /= outputs.Count;
+                frameRecord.EnergyAverage /= outputs.Count;
+                frameRecord.PowerAverage /= outputs.Count;
+                frameRecord.MaxPower /= outputs.Count;
+                frameRecord.MaxEnergy /= outputs.Count;
+                frameRecord.MinPower /= outputs.Count;
+                frameRecord.MinEnergy /= outputs.Count;
+                frameRecord.SampleCount /= outputs.Count;
+                output.FrameRecords.Add(frameRecord);
             }
 
             return output;
+        }
+
+        public static void WriteRecords(DataOutput parseOutput)
+        {
+            var powerRecordFile = "power.csv";
+            var energyRecordFile = "energy.csv";
+            var frameRecordFile = "frame.csv";
+
+            using (var writer = new StreamWriter(frameRecordFile))
+            {
+                using (var csv = new CsvWriter(writer))
+                {
+                    csv.WriteRecords(parseOutput.FrameRecords);
+                }
+            }
+
+            int eventIndex = 0;
+            var outputList = new List<OutputRecord>();
+            using (var writer = new StreamWriter(powerRecordFile))
+            {
+                using (var csv = new CsvWriter(writer))
+                {
+                    foreach (var record in parseOutput.PowerRecords)
+                    {
+                        var eventName = string.Empty;
+                        if (parseOutput.EventRecords != null)
+                        {
+                            while (eventIndex < parseOutput.EventRecords.Count && parseOutput.EventRecords[eventIndex].CTime < record.CTime)
+                            {
+                                eventName = parseOutput.EventRecords[eventIndex].Event;
+                                eventIndex++;
+                            }
+                        }
+                        var outputRecord = new OutputRecord(record, eventName);
+                        outputList.Add(outputRecord);
+
+                    }
+                    csv.WriteRecords(outputList);
+                }
+            }
+
+            eventIndex = 0;
+            outputList.Clear();
+            using (var writer = new StreamWriter(energyRecordFile))
+            {
+                using (var csv = new CsvWriter(writer))
+                {
+                    foreach (var record in parseOutput.EnergyRecords)
+                    {
+                        var eventName = string.Empty;
+                        if (parseOutput.EventRecords != null)
+                        {
+                            while (eventIndex < parseOutput.EventRecords.Count && parseOutput.EventRecords[eventIndex].CTime < record.CTime)
+                            {
+                                eventName = parseOutput.EventRecords[eventIndex].Event;
+                                eventIndex++;
+                            }
+                        }
+                        var outputRecord = new OutputRecord(record, eventName);
+                        outputList.Add(outputRecord);
+                    }
+                    csv.WriteRecords(outputList);
+                }
+            }
         }
     }
 }
