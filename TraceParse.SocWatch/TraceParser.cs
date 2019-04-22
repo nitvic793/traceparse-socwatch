@@ -138,6 +138,9 @@ namespace TraceParse.SocWatch
         public List<FrameRecord> FrameRecords;
     }
 
+    /// <summary>
+    /// Class to parse SocWatch trace files and corresponding log files. 
+    /// </summary>
     public static class TraceParser
     {
         public static DataOutput ParseFile(string file, string logFile)
@@ -232,7 +235,7 @@ namespace TraceParse.SocWatch
             float eValue = 0F;
             int idx = 0;
             int count = 0;
-            while (output.FrameRecords[frameIndex].CTime > output.PowerRecords[idx].CTime)
+            while (output.FrameRecords[frameIndex].CTime > output.PowerRecords[idx].CTime) //Align CTime with FrameTime
             {
                 idx++;
             }
@@ -245,10 +248,10 @@ namespace TraceParse.SocWatch
             {
                 if (frameIndex >= output.FrameRecords.Count)
                 {
-                    break;
+                    break; 
                 }
 
-                if (output.FrameRecords[frameIndex].CTime > output.PowerRecords[idx].CTime)
+                if (output.FrameRecords[frameIndex].CTime > output.PowerRecords[idx].CTime) //Align CTime with frame time. Average values in-between samples
                 {
                     if (output.PowerRecords[idx].PowerData <= minPower)
                     {
@@ -279,19 +282,19 @@ namespace TraceParse.SocWatch
                 if (output.FrameRecords[frameIndex].CTime <= output.PowerRecords[idx].CTime)
                 {
                     var frameRecord = output.FrameRecords[frameIndex];
-                    if (count != 0)
+                    if (count != 0) //If we need to average over multiple samples
                     {
                         frameRecord.MinEnergy = minEnergy;
                         frameRecord.MinPower = minPower;
                         frameRecord.MaxEnergy = maxEnergy;
                         frameRecord.MaxPower = maxPower;
-                        frameRecord.Power = pValue;
-                        frameRecord.Energy = eValue;
-                        frameRecord.PowerAverage = pValue / count;
-                        frameRecord.EnergyAverage = eValue / count;
+                        frameRecord.Power = pValue; //Total Power used within the frame
+                        frameRecord.Energy = eValue; //Total Energy used within the frame
+                        frameRecord.PowerAverage = pValue / count; // Power average
+                        frameRecord.EnergyAverage = eValue / count; // Energy average
                         frameRecord.SampleCount = count;
                     }
-                    else
+                    else //If CTime matches the frame time and we don't need to average the values
                     {
                         frameRecord.MinPower = output.PowerRecords[idx].PowerData;
                         frameRecord.MinEnergy = output.EnergyRecords[idx].EnergyData;
@@ -347,7 +350,7 @@ namespace TraceParse.SocWatch
                     if (i >= outputs[k].EnergyRecords.Count || i >= outputs[k].PowerRecords.Count)
                     {
                         stopProcessing = true;
-                        break;
+                        break; //If final few samples don't match, we stop processing and skip the last few records. This usually only amounts to the last 1-2 seconds of the SocWatch run. 
                     }
                     energyRecord.SampleNumber = outputs[k].EnergyRecords[i].SampleNumber;
                     energyRecord.CTime += outputs[k].EnergyRecords[i].CTime;
@@ -432,12 +435,8 @@ namespace TraceParse.SocWatch
             return output;
         }
 
-        public static void WriteRecords(DataOutput parseOutput)
+        public static void WriteRecords(DataOutput parseOutput, string powerRecordFile = "power.csv", string energyRecordFile = "energy.csv", string frameRecordFile = "frame.csv")
         {
-            var powerRecordFile = "power.csv";
-            var energyRecordFile = "energy.csv";
-            var frameRecordFile = "frame.csv";
-
             using (var writer = new StreamWriter(frameRecordFile))
             {
                 using (var csv = new CsvWriter(writer))
@@ -463,7 +462,7 @@ namespace TraceParse.SocWatch
                                 eventIndex++;
                             }
                         }
-                        var outputRecord = new OutputRecord(record, eventName);
+                        var outputRecord = new OutputRecord(record, eventName); //Create record with correlated event if present.
                         outputList.Add(outputRecord);
 
                     }
@@ -488,7 +487,7 @@ namespace TraceParse.SocWatch
                                 eventIndex++;
                             }
                         }
-                        var outputRecord = new OutputRecord(record, eventName);
+                        var outputRecord = new OutputRecord(record, eventName); //Create record with correlated event if present.
                         outputList.Add(outputRecord);
                     }
                     csv.WriteRecords(outputList);
