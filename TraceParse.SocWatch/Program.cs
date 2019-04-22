@@ -75,31 +75,6 @@ namespace TraceParse.SocWatch
                             Console.WriteLine(err);
                         }
                     });
-
-            //var file = "runs-dod/sp2_trace.csv";
-            //var logFile = "runs-dod/sp2_log.csv";
-            //if (args.Length > 0)
-            //{
-            //    file = args[0];
-            //}
-            //if (args.Length > 1)
-            //{
-            //    logFile = args[1];
-            //}
-
-            //var files = Directory.GetFiles("runs-dod/", "*.csv");
-            //var traceFiles = files.Where(s => s.Contains("_trace.csv")).ToArray();
-            //var logFiles = files.Where(s => s.Contains("_log.csv")).ToArray();
-            //var outputs = new List<DataOutput>();
-            //var index = 0;
-            //foreach (var csv in traceFiles)
-            //{
-            //    var parseOutput = TraceParser.ParseFile(csv, logFiles[index]);
-            //    outputs.Add(parseOutput);
-            //    index++;
-            //}
-
-            //TraceParser.WriteRecords(outputs[0]);
         }
     }
 }
