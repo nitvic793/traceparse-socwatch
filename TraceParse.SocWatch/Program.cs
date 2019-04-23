@@ -17,16 +17,16 @@ namespace TraceParse.SocWatch
             [Option('p', "parse", Required = true, HelpText = "Parse given trace file and log file.", SetName = "Single")]
             public bool Parse { get; set; }
 
-            [Option('a', "average", Required = true, HelpText = "Set output to verbose messages.", SetName = "Multi")]
+            [Option('a', "average", Required = true, HelpText = "Parse a batch of files and get average of results.", SetName = "Multi")]
             public bool Average { get; set; }
 
-            [Option('t', "tracefile", Required = true, HelpText = "Input files to be processed.", SetName = "Single")]
+            [Option('t', "tracefile", Required = true, HelpText = "Input trace file to be processed.", SetName = "Single")]
             public string InputTraceFile { get; set; }
 
-            [Option('l', "logfile", Required = true, HelpText = "Input files to be processed.", SetName = "Single")]
+            [Option('l', "logfile", Required = true, HelpText = "Input log file to be processed.", SetName = "Single")]
             public string InputLogFile { get; set; }
 
-            [Option('f', "folder", Required = true, HelpText = "Input files to be processed.", SetName = "Multi")]
+            [Option('f', "folder", Required = true, HelpText = "Folder with files to be processed.", SetName = "Multi")]
             public string RelativeFolder { get; set; }
         }
 
